@@ -1,7 +1,5 @@
 # Documentație Frontend (React Native Expo) – FSC V2 CU OPERATOR
 
-> **Notă:** Toate exemplele, explicațiile și denumirile sunt în română, la standarde moderne, cu accent pe claritate, UX și separare logică. Ecranele de test/mockup (cu nume de 3-4 litere) NU sunt incluse.
-
 ---
 
 ## Structură generală
