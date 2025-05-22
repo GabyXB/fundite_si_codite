@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { colors, shadows, neumorphic } from '../utils/theme';
 
 const CustomButton = ({
   title,
@@ -25,14 +26,15 @@ const CustomButton = ({
       style={[
         styles.button,
         getButtonStyle(),
-        disabled && styles.disabledButton
+        disabled && styles.disabledButton,
+        Platform.OS === 'ios' ? neumorphic.light : {}
       ]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? '#007AFF' : '#FFF'} />
+        <ActivityIndicator color={variant === 'outline' ? colors.primary : colors.background} />
       ) : (
         <Text style={[styles.text, getTextStyle()]}>{title}</Text>
       )}
@@ -48,25 +50,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: -4,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
   },
   secondaryButton: {
-    backgroundColor: '#5856D6',
+    backgroundColor: colors.accent,
   },
   outlineButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
   },
   disabledButton: {
     opacity: 0.5,
@@ -76,13 +84,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryText: {
-    color: '#FFF',
+    color: colors.background,
   },
   secondaryText: {
-    color: '#FFF',
+    color: colors.background,
   },
   outlineText: {
-    color: '#007AFF',
+    color: colors.primary,
   }
 });
 

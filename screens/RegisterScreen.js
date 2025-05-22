@@ -9,12 +9,17 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { moderateScale } from 'react-native-size-matters';
 
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { fontStyles, createTextStyle } from '../utils/fontSizes';
+
 
 const RegisterScreen = () => {
   const navigation = useNavigation();
@@ -80,7 +85,7 @@ const RegisterScreen = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://13.60.32.137:5000/api/auth/signup', {
+      const response = await fetch('http://13.60.13.114:5000/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,6 +132,11 @@ const RegisterScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={true}
+      />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -254,7 +264,8 @@ const RegisterScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F3FF',
+    backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -264,13 +275,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 20,
+    top: Platform.OS === 'ios' ? 40 : 20,
     left: 20,
     zIndex: 1,
     width: 40,
     height: 40,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
+    marginBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
@@ -314,20 +326,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
-    fontSize: 28,
+    fontSize: moderateScale(32),
     fontWeight: '700',
-    color: '#424874',
+    color: colors.title,
     marginBottom: 8,
-    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    letterSpacing: 0.3,
+    fontSize: moderateScale(16),
+    color: colors.text,
+    marginBottom: 32,
   },
   errorText: {
+    fontSize: moderateScale(14),
     color: '#FF3B30',
-    fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -372,16 +383,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   checkboxChecked: {
-    backgroundColor: '#424874',
+    backgroundColor: colors.primary,
   },
   termsText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: '#666',
     lineHeight: 20,
   },
   link: {
-    color: '#424874',
+    color: colors.primary,
     fontWeight: '600',
   },
   registerButton: {
@@ -403,6 +414,16 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
     }),
+  },
+  input: {
+    fontSize: moderateScale(16),
+    color: colors.text,
+    padding: moderateScale(16),
+  },
+  buttonText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: colors.background,
   },
 });
 

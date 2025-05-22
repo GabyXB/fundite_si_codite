@@ -11,12 +11,18 @@ import {
   RefreshControl,
   TextInput,
   Alert,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../context/AuthContext';
 import BottomNavigation from '../components/BottomNavigation';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { moderateScale } from 'react-native-size-matters';
+
+
 
 const ProductsScreen = () => {
   const navigation = useNavigation();
@@ -30,12 +36,38 @@ const ProductsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartItems, setCartItems] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortOrder, setSortOrder] = useState('none');
+  const [categories, setCategories] = useState([]);
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [showPriceSort, setShowPriceSort] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadData = async () => {
+        try {
+          setLoading(true);
+          await Promise.all([
+            fetchProducts(),
+            fetchServices(),
+            fetchCart()
+          ]);
+        } catch (error) {
+          console.error('Error loading data:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadData();
+    }, [category])
+  );
 
   useEffect(() => {
-    fetchProducts();
-    fetchServices();
-    fetchCart();
-  }, [category]);
+    // Extragem categoriile unice din produse
+    const uniqueCategories = [...new Set(products.map(p => p.categorie))];
+    setCategories(['all', ...uniqueCategories]);
+  }, [products]);
 
   const fetchProducts = async () => {
     try {
@@ -46,7 +78,7 @@ const ProductsScreen = () => {
         return;
       }
 
-      const response = await fetch(`http://13.60.32.137:5000/api/store`, {
+      const response = await fetch(`http://13.60.13.114:5000/api/store`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -74,7 +106,7 @@ const ProductsScreen = () => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/servicii', {
+      const response = await fetch('http://13.60.13.114:5000/api/servicii', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -85,19 +117,20 @@ const ProductsScreen = () => {
       }
 
       const data = await response.json();
+      console.log('Received services:', data);
       setServices(data);
-    } catch (error) {
+    } catch (error) { 
       console.error('Error fetching services:', error);
     }
   };
 
-  const fetchCart = async () => {
+  const createCart = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
       const userId = await AsyncStorage.getItem('userId');
       if (!token || !userId) return;
 
-      const response = await fetch('http://13.60.32.137:5000/api/cos/vezi', {
+      const response = await fetch('http://13.60.13.114:5000/api/cos/creaza', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -106,12 +139,81 @@ const ProductsScreen = () => {
         body: JSON.stringify({ user_id: userId }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCartItems(data.cart.CartItems || []);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Eroare la crearea coșului');
+      }
+
+      // După crearea coșului, îl încărcăm
+      await fetchCart();
+    } catch (err) {
+      console.error('Eroare la crearea coșului:', err);
+    }
+  };
+
+  const fetchCart = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userId = await AsyncStorage.getItem('userId');
+      if (!token || !userId) {
+        console.log('Token sau userId lipsesc:', { token: !!token, userId: !!userId });
+        setCartItems([]);
+        return;
+      }
+
+      console.log('Încercăm să accesăm coșul pentru user_id:', userId);
+
+      const response = await fetch(`http://13.60.13.114:5000/api/cos/vezi?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log('Status răspuns coș:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('Eroare răspuns coș:', errorData);
+        
+        if (response.status === 404) {
+          console.log('Coșul nu există, încercăm să-l creăm...');
+          await createCart();
+          return;
+        }
+        throw new Error(errorData.error || 'Eroare la preluarea coșului');
+      }
+
+      const data = await response.json();
+      console.log('Răspuns coș complet:', JSON.stringify(data, null, 2));
+
+      if (data.cart && data.cart.CartItems) {
+        // Procesăm datele pentru a le face compatibile cu frontend-ul
+        const processedItems = data.cart.CartItems.map(item => ({
+          id: item.id,
+          product_id: item.product_id,
+          cantitate: item.cantitate,
+          Product: item.Product ? {
+            id: item.Product.id,
+            nume: item.Product.nume,
+            pret: parseFloat(item.Product.pret),
+            imagine: item.Product.imagine,
+            detalii: item.Product.detalii,
+            cantitate: item.Product.cantitate,
+            categorie: item.Product.categorie
+          } : null
+        }));
+
+        console.log('Produse procesate:', processedItems);
+        setCartItems(processedItems);
+      } else {
+        console.log('Nu există produse în coș sau formatul răspunsului este invalid');
+        setCartItems([]);
       }
     } catch (err) {
       console.error('Eroare la preluarea coșului:', err);
+      setCartItems([]);
     }
   };
 
@@ -124,7 +226,7 @@ const ProductsScreen = () => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/cos/adaugare', {
+      const response = await fetch('http://13.60.13.114:5000/api/cos/adaugare', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -138,7 +240,8 @@ const ProductsScreen = () => {
       });
 
       if (response.ok) {
-        fetchCart();
+        // Reîmprospătăm coșul după adăugare
+        await fetchCart();
         Alert.alert('Succes', 'Produsul a fost adăugat în coș');
       } else {
         const errorData = await response.json();
@@ -149,6 +252,7 @@ const ProductsScreen = () => {
     }
   };
 
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchProducts();
@@ -156,16 +260,146 @@ const ProductsScreen = () => {
     fetchCart();
   };
 
-  const filteredProducts = products.filter(product =>
-    product.nume.toLowerCase().includes(searchQuery.toLowerCase())
+  const getFilteredAndSortedProducts = () => {
+    let filteredProducts = products.filter(product =>
+      product.nume.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    if (selectedCategory !== 'all') {
+      filteredProducts = filteredProducts.filter(p => p.categorie === selectedCategory);
+    }
+    
+    if (sortOrder !== 'none') {
+      filteredProducts.sort((a, b) => {
+        return sortOrder === 'asc' ? a.pret - b.pret : b.pret - a.pret;
+      });
+    }
+    
+    return filteredProducts;
+  };
+
+  const renderFilterButtons = () => (
+    <View style={styles.filterButtonsContainer}>
+      <TouchableOpacity
+        style={[styles.filterButton, showCategoryFilter && styles.filterButtonActive]}
+        onPress={() => {
+          setShowCategoryFilter(!showCategoryFilter);
+          setShowPriceSort(false);
+        }}
+      >
+        <Ionicons 
+          name="filter" 
+          size={20} 
+          color={showCategoryFilter ? '#fff' : '#666'} 
+        />
+        <Text style={[
+          styles.filterButtonText,
+          showCategoryFilter && styles.filterButtonTextActive
+        ]}>
+          Filtrare
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.filterButton, showPriceSort && styles.filterButtonActive]}
+        onPress={() => {
+          setShowPriceSort(!showPriceSort);
+          setShowCategoryFilter(false);
+        }}
+      >
+        <Ionicons 
+          name="swap-vertical" 
+          size={20} 
+          color={showPriceSort ? '#fff' : '#666'} 
+        />
+        <Text style={[
+          styles.filterButtonText,
+          showPriceSort && styles.filterButtonTextActive
+        ]}>
+          Sortare
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 
+  const renderCategoryOptions = () => (
+    <View style={styles.optionsContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {categories.filter(cat => cat !== 'all').map((cat) => (
+          <TouchableOpacity
+            key={cat}
+            style={[
+              styles.optionButton,
+              selectedCategory === cat && styles.optionButtonActive
+            ]}
+            onPress={() => {
+              setSelectedCategory(cat);
+              setShowCategoryFilter(false);
+            }}
+          >
+            <Text style={[
+              styles.optionButtonText,
+              selectedCategory === cat && styles.optionButtonTextActive
+            ]}>
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const renderSortOptions = () => (
+    <View style={styles.optionsContainer}>
+      <TouchableOpacity
+        style={[
+          styles.optionButton,
+          sortOrder === 'asc' && styles.optionButtonActive
+        ]}
+        onPress={() => {
+          setSortOrder(sortOrder === 'asc' ? 'none' : 'asc');
+          setShowPriceSort(false);
+        }}
+      >
+        <Text style={[
+          styles.optionButtonText,
+          sortOrder === 'asc' && styles.optionButtonTextActive
+        ]}>
+          Preț Crescător
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.optionButton,
+          sortOrder === 'desc' && styles.optionButtonActive
+        ]}
+        onPress={() => {
+          setSortOrder(sortOrder === 'desc' ? 'none' : 'desc');
+          setShowPriceSort(false);
+        }}
+      >
+        <Text style={[
+          styles.optionButtonText,
+          sortOrder === 'desc' && styles.optionButtonTextActive
+        ]}>
+          Preț Descrescător
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const filteredProducts = getFilteredAndSortedProducts();
   const filteredServices = services.filter(service =>
     service.nume.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderProductCard = (product) => (
-    <TouchableOpacity key={product.id} style={styles.productCard}>
+    <TouchableOpacity 
+      key={product.id} 
+      style={styles.productCard}
+      onPress={() => navigation.navigate('SpecificProduct', { productId: product.id })}
+    >
       <Image 
         source={{ uri: product.imagine || 'https://via.placeholder.com/150' }} 
         style={styles.productImage} 
@@ -183,118 +417,144 @@ const ProductsScreen = () => {
         style={styles.addToCartButton}
         onPress={() => addToCart(product.id)}
       >
-        <Ionicons name="add-circle" size={24} color="#2D3FE7" />
+        <Ionicons name="add-circle" size={24} color={colors.primary} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const renderServiceCard = (service) => (
-    <TouchableOpacity key={service.id} style={styles.serviceCard}>
+    <TouchableOpacity
+      key={service.id}
+      style={styles.serviceCard}
+      onPress={() => navigation.navigate('Service', { serviceId: service.id })}
+    >
+      <Image
+        source={{ uri: service.imagine }}
+        style={styles.serviceImage}
+        resizeMode="cover"
+      />
       <View style={styles.serviceInfo}>
         <Text style={styles.serviceName}>{service.nume}</Text>
-        <Text style={styles.serviceDescription}>{service.detalii}</Text>
-        <View style={styles.serviceDetails}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color="#FFC107" />
-            <Text style={styles.ratingText}>{service.rating || 4.5}</Text>
-            <Text style={styles.reviewCount}>({service.reviews || 0})</Text>
-          </View>
-          <View style={styles.durationContainer}>
-            <Ionicons name="time-outline" size={16} color="#94A3B8" />
-            <Text style={styles.durationText}>{service.durata || 60} minute</Text>
-          </View>
-        </View>
         <Text style={styles.servicePrice}>{service.pret} RON</Text>
+        <Text style={styles.serviceDescription} numberOfLines={2}>
+          {service.descriere}
+        </Text>
+        <TouchableOpacity
+          style={styles.scheduleButton}
+          onPress={() => navigation.navigate('NewAppointment', { service })}
+        >
+          <Ionicons name="calendar-outline" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+          <Text style={styles.scheduleButtonText}>Programează-te</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity 
-        style={styles.bookButton}
-        onPress={() => navigation.navigate('NewAppointment', { serviceId: service.id })}
-      >
-        <Ionicons name="calendar" size={24} color="#2D3FE7" />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {category === 'grooming' ? 'Grooming' :
-           category === 'styling' ? 'Styling' :
-           category === 'health' ? 'Health' :
-           category === 'spa' ? 'Spa' : 'Toate Produsele'}
-        </Text>
-        <TouchableOpacity
-          style={styles.cartButton}
-          onPress={() => navigation.navigate('Cart')}
-        >
-          <Ionicons name="cart" size={24} color="#1F2937" />
-          {cartItems.length > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#94A3B8" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Caută produse sau servicii..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#94A3B8"
-        />
-      </View>
-
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-          onPress={() => setActiveTab('products')}
-        >
-          <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
-            Produse
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'services' && styles.activeTab]}
-          onPress={() => setActiveTab('services')}
-        >
-          <Text style={[styles.tabText, activeTab === 'services' && styles.activeTabText]}>
-            Servicii
-          </Text>
-        </TouchableOpacity>
-      </View>
-
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={true}
+      />
       <ScrollView 
-        style={styles.content}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
         }
       >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text>Se încarcă...</Text>
-          </View>
-        ) : activeTab === 'products' ? (
-          filteredProducts.length > 0 ? (
-            filteredProducts.map(renderProductCard)
+        <View style={styles.headerHomeLike}>
+          <Text style={styles.titleHomeLike}>
+            {category === 'grooming' ? 'Grooming' :
+             category === 'styling' ? 'Styling' :
+             category === 'health' ? 'Health' :
+             category === 'spa' ? 'Spa' : 'Toate Produsele'}
+          </Text>
+          <TouchableOpacity
+            style={styles.cartButtonHomeLike}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart" size={28} color={colors.primary} />
+            {cartItems.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Caută produse sau servicii..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#94A3B8"
+          />
+        </View>
+
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+            onPress={() => setActiveTab('products')}
+          >
+            <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+              Produse
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'services' && styles.activeTab]}
+            onPress={() => setActiveTab('services')}
+          >
+            <Text style={[styles.tabText, activeTab === 'services' && styles.activeTabText]}>
+              Servicii
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'products' && (
+          <>
+            {renderFilterButtons()}
+            {showCategoryFilter && renderCategoryOptions()}
+            {showPriceSort && renderSortOptions()}
+          </>
+        )}
+
+        <ScrollView 
+          style={styles.content}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text>Se încarcă...</Text>
+            </View>
+          ) : activeTab === 'products' ? (
+            filteredProducts.length > 0 ? (
+              filteredProducts.map(renderProductCard)
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Nu există produse în această categorie</Text>
+              </View>
+            )
+          ) : filteredServices.length > 0 ? (
+            filteredServices.map(renderServiceCard)
           ) : (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Nu există produse în această categorie</Text>
+              <Text style={styles.emptyText}>Nu există servicii în această categorie</Text>
             </View>
-          )
-        ) : filteredServices.length > 0 ? (
-          filteredServices.map(renderServiceCard)
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Nu există servicii în această categorie</Text>
-          </View>
-        )}
+          )}
+        </ScrollView>
       </ScrollView>
-
-      <BottomNavigation />
+      <View style={styles.bottomNavContainer}>
+        <BottomNavigation />
+      </View>
     </SafeAreaView>
   );
 };
@@ -302,25 +562,44 @@ const ProductsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  header: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100, // Mărim padding-ul pentru a evita suprapunerea cu BottomNavigation
+  },
+  headerHomeLike: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingTop: Platform.OS === 'ios' ? 10 : 15,
     paddingBottom: 20,
+    backgroundColor: '#fff',
+    marginBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  backButton: {
-    padding: 8,
+  titleHomeLike: {
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    color: colors.primary,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  cartButton: {
+  cartButtonHomeLike: {
     padding: 8,
     position: 'relative',
   },
@@ -382,12 +661,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   activeTab: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
   },
   tabText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#000000',
   },
   activeTabText: {
     color: '#FFFFFF',
@@ -465,7 +744,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2D3FE7',
+    color: colors.primary,
     marginTop: 4,
   },
   addToCartButton: {
@@ -488,6 +767,12 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  serviceImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFF',
+  },
   serviceInfo: {
     flex: 1,
   },
@@ -501,29 +786,120 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 4,
   },
-  serviceDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  durationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 16,
-  },
-  durationText: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: '#94A3B8',
-  },
   servicePrice: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2D3FE7',
+    color: colors.primary,
     marginTop: 8,
   },
-  bookButton: {
-    padding: 8,
+  scheduleButton: {
+    backgroundColor: colors.primary,
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(45, 63, 231, 0.3)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  scheduleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  filterButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    marginVertical: 10,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    backgroundColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  filterButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+  },
+  optionsContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginHorizontal: 20,
+    marginBottom:20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  optionButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 5,
+    backgroundColor: '#f0f0f0',
+  },
+  optionButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  optionButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  optionButtonTextActive: {
+    color: '#fff',
+  },
+  bottomNavContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
   },
 });
 

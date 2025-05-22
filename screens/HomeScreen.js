@@ -9,13 +9,16 @@ import {
   Image,
   Platform,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavigation from '../components/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { profileImage } from '../assets/placeholders/placeholder';
 import PetCard from '../components/PetCard';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { moderateScale } from 'react-native-size-matters';
 
 const HomeScreen = () => {
   const screenWidth = Dimensions.get('window').width;
@@ -25,11 +28,26 @@ const HomeScreen = () => {
   const [nextAppointment, setNextAppointment] = useState(null);
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    fetchPets();
-    fetchNextAppointment();
-    fetchUserProfile();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadData = async () => {
+        try {
+          setLoading(true);
+          await Promise.all([
+            fetchPets(),
+            fetchNextAppointment(),
+            fetchUserProfile()
+          ]);
+        } catch (error) {
+          console.error('Error loading data:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadData();
+    }, [])
+  );
 
   const fetchPets = async () => {
     try {
@@ -39,7 +57,7 @@ const HomeScreen = () => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/pets/me', {
+      const response = await fetch('http://13.60.13.114:5000/api/pets/me', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -70,7 +88,7 @@ const HomeScreen = () => {
         return;
       }
 
-      const response = await fetch(`http://13.60.32.137:5000/api/programari/user/${userId}`, {
+      const response = await fetch(`http://13.60.13.114:5000/api/programari/user/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -118,7 +136,7 @@ const HomeScreen = () => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/users/me', {
+      const response = await fetch('http://13.60.13.114:5000/api/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -137,120 +155,125 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Section */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Bună,</Text>
-          <Text style={styles.userName}>{user?.name || 'Utilizator'}</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Image
-            source={{ uri: user?.imagine || 'https://via.placeholder.com/100' }}
-            style={styles.profileImage}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Next Appointment Card */}
-      {nextAppointment && (
-        <TouchableOpacity 
-          style={styles.appointmentCard}
-          onPress={() => navigation.navigate('AppointmentDetails', { appointmentId: nextAppointment.id })}
-        >
-          <View style={styles.groomerInfo}>
-            <View style={styles.groomerDetails}>
-              <Text style={styles.groomerName}>Următoarea Programare</Text>
-              <Text style={styles.groomerSpecialty}>{nextAppointment.service}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Bună,</Text>
+            <Text style={styles.userName}>{user?.name || 'Utilizator'}</Text>
           </View>
-          <View style={styles.appointmentTime}>
-            <View style={styles.timeItem}>
-              <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.timeText}>{nextAppointment.date}</Text>
-            </View>
-            <View style={styles.timeItem}>
-              <Ionicons name="time-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.timeText}>{nextAppointment.time}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#94A3B8" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search services or pet issues"
-          placeholderTextColor="#94A3B8"
-        />
-      </View>
-
-      {/* Quick Access Icons */}
-      <View style={styles.quickAccess}>
-        <TouchableOpacity 
-          style={styles.quickAccessItem}
-          onPress={() => navigation.navigate('Products', { category: 'grooming' })}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
-            <Ionicons name="paw" size={24} color="#2196F3" />
-          </View>
-          <Text style={styles.quickAccessText}>Grooming</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickAccessItem}
-          onPress={() => navigation.navigate('Products', { category: 'styling' })}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
-            <Ionicons name="cut" size={24} color="#9C27B0" />
-          </View>
-          <Text style={styles.quickAccessText}>Styling</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickAccessItem}
-          onPress={() => navigation.navigate('Products', { category: 'health' })}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
-            <Ionicons name="medkit" size={24} color="#4CAF50" />
-          </View>
-          <Text style={styles.quickAccessText}>Health</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickAccessItem}
-          onPress={() => navigation.navigate('Products', { category: 'spa' })}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
-            <Ionicons name="home" size={24} color="#FF9800" />
-          </View>
-          <Text style={styles.quickAccessText}>Spa</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Pets Section */}
-      <View style={styles.nearbySection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Animalele mele</Text>
           <TouchableOpacity 
-            style={styles.addPetButton}
-            onPress={() => navigation.navigate('AddPet')}
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
           >
-            <Ionicons name="add-circle-outline" size={24} color="#2D3FE7" />
-            <Text style={styles.addPetButtonText}>Adaugă</Text>
+            <Image
+              source={{ uri: user?.image || 'https://via.placeholder.com/100' }}
+              style={styles.profileImage}
+            />
           </TouchableOpacity>
         </View>
-        {pets.map((pet) => (
-          <PetCard
-            key={pet.id}
-            pet={pet}
-            onPress={() => navigation.navigate('PetDetails', { petId: pet.id })}
-          />
-        ))}
-      </View>
 
+        {/* Next Appointment Card */}
+        {nextAppointment && (
+          <TouchableOpacity 
+            style={styles.appointmentCard}
+            onPress={() => navigation.navigate('AppointmentDetails', { appointmentId: nextAppointment.id })}
+          >
+            <View style={styles.groomerInfo}>
+              <View style={styles.groomerDetails}>
+                <Text style={styles.groomerName}>Următoarea Programare</Text>
+                <Text style={styles.groomerSpecialty}>{nextAppointment.service}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.appointmentTime}>
+              <View style={styles.timeItem}>
+                <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.timeText}>{nextAppointment.date}</Text>
+              </View>
+              <View style={styles.timeItem}>
+                <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.timeText}>{nextAppointment.time}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search services or pet issues"
+            placeholderTextColor="#94A3B8"
+          />
+        </View>
+
+        {/* Quick Access Icons */}
+        <View style={styles.quickAccess}>
+          <TouchableOpacity 
+            style={styles.quickAccessItem}
+            onPress={() => navigation.navigate('Products', { category: 'Servicii' })}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+              <Ionicons name="paw" size={24} color="#2196F3" />
+            </View>
+            <Text style={styles.quickAccessText}>Tuns</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.quickAccessItem}
+            onPress={() => navigation.navigate('Products', { category: 'Servicii' })}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
+              <Ionicons name="cut" size={24} color="#9C27B0" />
+            </View>
+            <Text style={styles.quickAccessText}>Stilizare</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.quickAccessItem}
+            onPress={() => navigation.navigate('Products', { category: 'health' })}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
+              <Ionicons name="medkit" size={24} color="#4CAF50" />
+            </View>
+            <Text style={styles.quickAccessText}>Sănătate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.quickAccessItem}
+            onPress={() => navigation.navigate('Products', { category: 'spa' })}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
+              <Ionicons name="home" size={24} color="#FF9800" />
+            </View>
+            <Text style={styles.quickAccessText}>Pentru Acasă</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Pets Section */}
+        <View style={styles.nearbySection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Animalele mele</Text>
+            <TouchableOpacity 
+              style={styles.addPetButton}
+              onPress={() => navigation.navigate('AddPet')}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+              <Text style={styles.addPetButtonText}>Adaugă</Text>
+            </TouchableOpacity>
+          </View>
+          {pets.map((pet) => (
+            <PetCard
+              key={pet.id}
+              pet={pet}
+              onPress={() => navigation.navigate('PetDetails', { petId: pet.id })}
+            />
+          ))}
+        </View>
+      </ScrollView>
       <BottomNavigation />
     </SafeAreaView>
   );
@@ -259,98 +282,150 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 80, // Spațiu pentru BottomNavigation
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingTop: Platform.OS === 'ios' ? 15 : 30,
     paddingBottom: 20,
+    backgroundColor: 'white',
+    marginBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   greeting: {
-    fontSize: 16,
-    color: '#94A3B8',
+    fontSize: moderateScale(16),
+    color: colors.text,
   },
   userName: {
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontWeight: '700',
-    color: '#1F2937',
-    marginTop: 4,
+    color: colors.title,
   },
   profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2D3FE7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: -4,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   profileImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: '100%',
+    height: '100%',
   },
   appointmentCard: {
-    backgroundColor: '#2D3FE7',
-    borderRadius: 16,
     marginHorizontal: 20,
-    padding: 16,
-    marginTop: 20,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: {
+          width: 0,
+          height: 8,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   groomerInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  groomerImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   groomerDetails: {
     flex: 1,
-    marginLeft: 12,
   },
   groomerName: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: moderateScale(20),
+    fontWeight: '700',
+    color: colors.background,
+    marginBottom: 4,
   },
   groomerSpecialty: {
-    color: '#E0E7FF',
-    fontSize: 14,
+    fontSize: moderateScale(16),
+    color: colors.background,
+    opacity: 0.9,
   },
   appointmentTime: {
-    marginTop: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 12,
+    borderRadius: 16,
   },
   timeItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   timeText: {
-    color: '#FFFFFF',
-    marginLeft: 8,
-    fontSize: 14,
+    fontSize: moderateScale(14),
+    color: colors.background,
+    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    marginBottom: 24,
+    paddingHorizontal: 20,
     height: 56,
+    borderRadius: 16,
+    backgroundColor: 'white',
     ...Platform.select({
       ios: {
-        shadowColor: 'rgba(149, 157, 165, 0.1)',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 16,
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: -4,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
       },
       android: {
         elevation: 4,
@@ -360,59 +435,106 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 12,
-    fontSize: 16,
-    color: '#1F2937',
+    fontSize: moderateScale(16),
+    color: colors.title,
   },
   quickAccess: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginTop: 24,
+    marginBottom: 32,
   },
   quickAccessItem: {
     alignItems: 'center',
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: -4,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   quickAccessText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#1F2937',
+    fontSize: moderateScale(12),
+    color: colors.text,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   nearbySection: {
-    marginTop: 24,
+    flex: 1,
     paddingHorizontal: 20,
-    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: -4,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.title,
   },
   addPetButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    gap: 4,
+    backgroundColor: colors.background,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.accent,
+        shadowOffset: {
+          width: -2,
+          height: -2,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   addPetButtonText: {
-    marginLeft: 4,
-    fontSize: 14,
+    fontSize: moderateScale(14),
+    color: colors.accent,
     fontWeight: '600',
-    color: '#2D3FE7',
   },
 });
 

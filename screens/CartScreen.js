@@ -10,22 +10,36 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Animated,
+  RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from '../components/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { useFocusEffect } from '@react-navigation/native';
+
+
 
 const CartScreen = ({ navigation }) => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [stockIssues, setStockIssues] = useState([]);
+  const [fadeAnim] = useState(new Animated.Value(1));
 
-  useEffect(() => {
-    fetchCart();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchCart();
+    }, [])
+  );
 
   const fetchCart = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const token = await AsyncStorage.getItem('token');
       const userId = await AsyncStorage.getItem('userId');
       if (!token || !userId) {
@@ -33,8 +47,7 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      console.log('Fetching cart for user:', userId);
-      const response = await fetch(`http://13.60.32.137:5000/api/cos/vezi?user_id=${userId}`, {
+      const response = await fetch(`http://13.60.13.114:5000/api/cos/vezi?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -42,40 +55,34 @@ const CartScreen = ({ navigation }) => {
         }
       });
 
-      // Log the raw response for debugging
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      // Try to parse the response as JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        throw new Error('Server returned invalid JSON');
-      }
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch cart items');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Eroare la preluarea coșului');
       }
 
+      const data = await response.json();
+      console.log('Răspuns coș:', data);
       if (data.cart && data.cart.CartItems) {
         const cartItemsWithProducts = data.cart.CartItems.map(item => ({
           productId: item.product_id,
           nume: item.Product.nume,
           pret: parseFloat(item.Product.pret),
           imagine: item.Product.imagine,
-          quantity: item.cantitate
+          quantity: item.cantitate,
+          available: item.Product.cantitate
         }));
         setCartItems(cartItemsWithProducts);
+        setStockIssues(data.cart.stockIssues || []);
       } else {
         setCartItems([]);
+        setStockIssues([]);
       }
     } catch (err) {
       console.error('Error fetching cart:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -87,7 +94,14 @@ const CartScreen = ({ navigation }) => {
         throw new Error('Trebuie să fii autentificat');
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/cos/scoate', {
+      // Animație de fade out
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+
+      const response = await fetch('http://13.60.13.114:5000/api/cos/scoate', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -101,12 +115,19 @@ const CartScreen = ({ navigation }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to remove item from cart');
+        throw new Error(errorData.error || 'Eroare la eliminarea produsului din coș');
       }
+
+      // Animație de fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
 
       setCartItems(cartItems.filter(item => item.productId !== productId));
     } catch (err) {
-      Alert.alert('Error', err.message);
+      Alert.alert('Eroare', err.message);
     }
   };
 
@@ -123,7 +144,7 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/cos/modifica', {
+      const response = await fetch('http://13.60.13.114:5000/api/cos/modifica', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -138,16 +159,22 @@ const CartScreen = ({ navigation }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update quantity');
+        throw new Error(errorData.error || 'Eroare la actualizarea cantității');
       }
 
+      const data = await response.json();
+      // Dacă backendul trimite item cu relația Product, actualizez și available, altfel doar quantity
       setCartItems(cartItems.map(item => 
         item.productId === productId 
-          ? { ...item, quantity: newQuantity }
+          ? {
+              ...item,
+              quantity: newQuantity,
+              available: data.item && data.item.Product ? data.item.Product.cantitate : item.available
+            }
           : item
       ));
     } catch (err) {
-      Alert.alert('Error', err.message);
+      Alert.alert('Eroare', err.message);
     }
   };
 
@@ -166,7 +193,16 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/cos/finalizeaza', {
+      if (stockIssues.length > 0) {
+        Alert.alert(
+          'Stoc insuficient',
+          'Unele produse nu mai sunt în stoc în cantitatea dorită. Te rugăm să actualizezi cantitățile.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const response = await fetch('http://13.60.13.114:5000/api/cos/finalizeaza', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -181,19 +217,35 @@ const CartScreen = ({ navigation }) => {
       }
 
       const data = await response.json();
-      Alert.alert('Succes', 'Comanda a fost plasată cu succes!');
-      setCartItems([]);
-      navigation.navigate('Products');
+      Alert.alert(
+        'Succes',
+        'Comanda a fost plasată cu succes!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setCartItems([]);
+              navigation.navigate('Products');
+            }
+          }
+        ]
+      );
     } catch (err) {
       Alert.alert('Eroare', err.message);
     }
   };
 
-  if (loading) {
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCart();
+  };
+
+  if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2D3FE7" />
+          <Text style={styles.loadingText}>Se încarcă coșul...</Text>
         </View>
       </SafeAreaView>
     );
@@ -203,14 +255,17 @@ const CartScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchCart}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>Reîncearcă</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
+
+  console.log('cartItems:', cartItems);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -225,7 +280,19 @@ const CartScreen = ({ navigation }) => {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2D3FE7']}
+            tintColor="#2D3FE7"
+          />
+        }
+      >
         {cartItems.length === 0 ? (
           <View style={styles.emptyCartContainer}>
             <Ionicons name="cart-outline" size={64} color="#94A3B8" />
@@ -239,48 +306,77 @@ const CartScreen = ({ navigation }) => {
           </View>
         ) : (
           <>
-            {cartItems.map((item) => (
-              <View key={item.productId} style={styles.cartItem}>
-                <Image
-                  source={{ uri: item.imagine }}
-                  style={styles.productImage}
-                />
-                <View style={styles.itemDetails}>
-                  <Text style={styles.productName}>{item.nume}</Text>
-                  <Text style={styles.productPrice}>{item.pret.toFixed(2)} RON</Text>
-                  <View style={styles.quantityContainer}>
-                    <TouchableOpacity
-                      style={styles.quantityButton}
-                      onPress={() => updateQuantity(item.productId, item.quantity - 1)}
-                    >
-                      <Ionicons name="remove" size={20} color="#2D3FE7" />
-                    </TouchableOpacity>
-                    <Text style={styles.quantityText}>{item.quantity}</Text>
-                    <TouchableOpacity
-                      style={styles.quantityButton}
-                      onPress={() => updateQuantity(item.productId, item.quantity + 1)}
-                    >
-                      <Ionicons name="add" size={20} color="#2D3FE7" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeFromCart(item.productId)}
-                >
-                  <Ionicons name="trash-outline" size={24} color="#EF4444" />
-                </TouchableOpacity>
+            {stockIssues.length > 0 && (
+              <View style={styles.stockWarningContainer}>
+                <Ionicons name="warning-outline" size={24} color="#F59E0B" />
+                <Text style={styles.stockWarningText}>
+                  Unele produse nu mai sunt în stoc în cantitatea dorită
+                </Text>
               </View>
-            ))}
+            )}
+            <Animated.View style={{ opacity: fadeAnim }}>
+              {cartItems.map((item) => (
+                <View key={item.productId} style={styles.cartItem}>
+                  <Image
+                    source={{ uri: item.imagine }}
+                    style={styles.productImage}
+                  />
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.productName}>{item.nume}</Text>
+                    <Text style={styles.productPrice}>{item.pret.toFixed(2)} RON</Text>
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => updateQuantity(item.productId, item.quantity - 1)}
+                      >
+                        <Ionicons name="remove" size={20} color="#2D3FE7" />
+                      </TouchableOpacity>
+                      <Text style={styles.quantityText}>{item.quantity}</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.quantityButton,
+                          item.quantity >= item.available && styles.quantityButtonDisabled
+                        ]}
+                        onPress={() => updateQuantity(item.productId, item.quantity + 1)}
+                        disabled={item.quantity >= item.available}
+                      >
+                        <Ionicons 
+                          name="add" 
+                          size={20} 
+                          color={item.quantity >= item.available ? '#94A3B8' : '#2D3FE7'} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {item.quantity > item.available && (
+                      <Text style={styles.stockWarning}>
+                        Stoc disponibil: {item.available}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeFromCart(item.productId)}
+                  >
+                    <Ionicons name="trash-outline" size={24} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </Animated.View>
             <View style={styles.totalContainer}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalAmount}>{calculateTotal()} RON</Text>
             </View>
-            <TouchableOpacity 
-              style={styles.checkoutButton}
+            <TouchableOpacity
+              style={[
+                styles.checkoutButton,
+                stockIssues.length > 0 && styles.checkoutButtonDisabled
+              ]}
               onPress={handleCheckout}
+              disabled={stockIssues.length > 0}
             >
-              <Text style={styles.checkoutButtonText}>Finalizează comanda</Text>
+              <Text style={styles.checkoutButtonText}>
+                {stockIssues.length > 0 ? 'Rezolvă problemele de stoc' : 'Finalizează comanda'}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -294,12 +390,24 @@ const CartScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 80, // Spațiu pentru BottomNavigation
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#000000',
   },
   errorContainer: {
     flex: 1,
@@ -308,15 +416,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: '#EF4444',
+    marginTop: 12,
     fontSize: 16,
-    marginBottom: 20,
+    color: '#94A3B8',
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#2D3FE7',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: colors.primary,
     borderRadius: 8,
   },
   retryButtonText: {
@@ -329,6 +438,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
+    marginTop: 20,
     paddingTop: Platform.OS === 'ios' ? 44 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
@@ -337,16 +447,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#1E293B',
   },
   headerRight: {
     width: 40,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
   },
   emptyCartContainer: {
     flex: 1,
@@ -356,12 +462,12 @@ const styles = StyleSheet.create({
   },
   emptyCartText: {
     fontSize: 18,
-    color: '#64748B',
+    color: '#000000',
     marginTop: 16,
     marginBottom: 24,
   },
   shopButton: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -371,11 +477,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  stockWarningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  stockWarningText: {
+    marginLeft: 8,
+    color: '#92400E',
+    fontSize: 14,
+    flex: 1,
+  },
   cartItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -396,7 +516,7 @@ const styles = StyleSheet.create({
   },
   productPrice: {
     fontSize: 14,
-    color: '#2D3FE7',
+    color: colors.primary,
     marginBottom: 8,
   },
   quantityContainer: {
@@ -413,6 +533,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  quantityButtonDisabled: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
   quantityText: {
     fontSize: 16,
     fontWeight: '600',
@@ -422,12 +546,17 @@ const styles = StyleSheet.create({
   removeButton: {
     padding: 8,
   },
+  stockWarning: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+  },
   totalContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginTop: 16,
   },
@@ -439,14 +568,17 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3FE7',
+    color: colors.primary,
   },
   checkoutButton: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 12,
     marginTop: 16,
     marginBottom: 32,
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: colors.secondary,
   },
   checkoutButtonText: {
     color: '#FFFFFF',

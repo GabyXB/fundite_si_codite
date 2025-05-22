@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import { colors } from '../utils/theme';
+import TimeSelectionSlider from '../components/TimeSelectionSlider';
 
 const NewAppointmentScreen = () => {
   const navigation = useNavigation();
@@ -23,19 +25,24 @@ const NewAppointmentScreen = () => {
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState(new Date());
+  const [hours, setHours] = useState(new Date().getHours());
+  const [minutes, setMinutes] = useState(new Date().getMinutes());
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [showDateModal, setShowDateModal] = useState(false);
-  const [showTimeModal, setShowTimeModal] = useState(false);
   const [tempDate, setTempDate] = useState('');
-  const [tempTime, setTempTime] = useState('');
   const [loadingServices, setLoadingServices] = useState(true);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [employees, setEmployees] = useState([]);
 
-  useEffect(() => {
-    fetchPets();
-    fetchServices();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadData = async () => {
+        await Promise.all([fetchPets(), fetchServices(), fetchEmployees()]);
+      };
+      loadData();
+    }, [])
+  );
 
   const fetchPets = async () => {
     try {
@@ -44,7 +51,7 @@ const NewAppointmentScreen = () => {
         throw new Error('Nu sunteți autentificat');
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/pets/me', {
+      const response = await fetch('http://13.60.13.114:5000/api/pets/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -72,7 +79,7 @@ const NewAppointmentScreen = () => {
         throw new Error('Nu sunteți autentificat');
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/servicii', {
+      const response = await fetch('http://13.60.13.114:5000/api/servicii', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -95,6 +102,22 @@ const NewAppointmentScreen = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+      const response = await fetch('http://13.60.13.114:5000/api/angajati', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Eroare la încărcarea angajaților');
+      const data = await response.json();
+      setEmployees(data);
+      if (data.length > 0) setSelectedEmployee(data[0].id);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   const handleDateConfirm = () => {
     const [day, month, year] = tempDate.split('/');
     const newDate = new Date(year, month - 1, day);
@@ -102,17 +125,20 @@ const NewAppointmentScreen = () => {
     setShowDateModal(false);
   };
 
-  const handleTimeConfirm = () => {
-    const [hours, minutes] = tempTime.split(':');
-    const newTime = new Date();
-    newTime.setHours(parseInt(hours), parseInt(minutes));
-    setTime(newTime);
-    setShowTimeModal(false);
-  };
-
   const handleSubmit = async () => {
     if (!selectedPet) {
       Alert.alert('Eroare', 'Selectați un animal');
+      return;
+    }
+
+    const now = new Date();
+    const appointmentDateTime = new Date(date);
+    appointmentDateTime.setHours(hours);
+    appointmentDateTime.setMinutes(minutes);
+    appointmentDateTime.setSeconds(0);
+    appointmentDateTime.setMilliseconds(0);
+    if (appointmentDateTime.getTime() <= now.getTime()) {
+      Alert.alert('Eroare', 'Nu poți face o programare în trecut sau la o oră deja trecută!');
       return;
     }
 
@@ -124,18 +150,12 @@ const NewAppointmentScreen = () => {
         throw new Error('Nu sunteți autentificat');
       }
 
-      // Obținem user_id din token
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
         throw new Error('Nu s-a putut obține ID-ul utilizatorului');
       }
 
-      // Combinăm data și ora
-      const appointmentDateTime = new Date(date);
-      appointmentDateTime.setHours(time.getHours());
-      appointmentDateTime.setMinutes(time.getMinutes());
-
-      const response = await fetch('http://13.60.32.137:5000/api/programari/creare', {
+      const response = await fetch('http://13.60.13.114:5000/api/programari/creare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,6 +166,7 @@ const NewAppointmentScreen = () => {
           pet_id: selectedPet,
           serviciu_id: selectedService,
           timestamp: appointmentDateTime.toISOString(),
+          angajat_id: selectedEmployee,
         }),
       });
 
@@ -212,17 +233,12 @@ const NewAppointmentScreen = () => {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Ora</Text>
-          <TouchableOpacity
-            style={styles.dateTimeButton}
-            onPress={() => setShowTimeModal(true)}
-          >
-            <Text style={styles.dateTimeText}>
-              {time.toLocaleTimeString('ro-RO', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          </TouchableOpacity>
+          <TimeSelectionSlider
+            hours={hours}
+            minutes={minutes}
+            onHoursChange={setHours}
+            onMinutesChange={setMinutes}
+          />
         </View>
 
         <View style={styles.formGroup}>
@@ -248,6 +264,25 @@ const NewAppointmentScreen = () => {
           )}
         </View>
 
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Stilist</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedEmployee}
+              onValueChange={(itemValue) => setSelectedEmployee(itemValue)}
+              style={styles.picker}
+            >
+              {employees.map((emp) => (
+                <Picker.Item
+                  key={emp.id}
+                  label={`${emp.nume} ${emp.prenume} (${emp.rol === 0 ? 'Stilist' : 'Alt rol'})`}
+                  value={emp.id}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
         <TouchableOpacity
           style={[styles.submitButton, loading && styles.submitButtonDisabled]}
           onPress={handleSubmit}
@@ -271,7 +306,13 @@ const NewAppointmentScreen = () => {
               style={styles.input}
               placeholder="DD/MM/YYYY"
               value={tempDate}
-              onChangeText={setTempDate}
+              onChangeText={(text) => {
+                let val = text.replace(/[^0-9]/g, '');
+                if (val.length > 2) val = val.slice(0,2) + '/' + val.slice(2);
+                if (val.length > 5) val = val.slice(0,5) + '/' + val.slice(5,9);
+                if (val.length > 10) val = val.slice(0,10);
+                setTempDate(val);
+              }}
               keyboardType="numeric"
             />
             <View style={styles.modalButtons}>
@@ -291,39 +332,6 @@ const NewAppointmentScreen = () => {
           </View>
         </View>
       </Modal>
-
-      <Modal
-        visible={showTimeModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selectați ora</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="HH:MM"
-              value={tempTime}
-              onChangeText={setTempTime}
-              keyboardType="numeric"
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowTimeModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Anulare</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleTimeConfirm}
-              >
-                <Text style={styles.modalButtonText}>Confirmare</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -331,7 +339,7 @@ const NewAppointmentScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -407,7 +415,7 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   submitButton: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -469,14 +477,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   cancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.accent,
   },
   confirmButton: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
   },
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

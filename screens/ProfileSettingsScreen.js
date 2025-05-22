@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -9,21 +9,29 @@ import {
   Platform,
   Alert,
   ScrollView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import AuthContext from '../context/AuthContext';
 
 const ProfileSettingsScreen = () => {
   const navigation = useNavigation();
+  const { signOut } = useContext(AuthContext);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    image: null,
   });
 
   useEffect(() => {
@@ -33,11 +41,12 @@ const ProfileSettingsScreen = () => {
   const fetchUserProfile = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!token || !userId) {
         throw new Error('Nu sunteți autentificat');
       }
 
-      const response = await fetch('http://13.60.32.137:5000/api/auth/profile', {
+      const response = await fetch(`http://13.60.13.114:5000/api/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -53,6 +62,7 @@ const ProfileSettingsScreen = () => {
         ...prev,
         name: data.name || '',
         email: data.email || '',
+        image: data.image,
       }));
     } catch (error) {
       Alert.alert('Eroare', error.message);
@@ -68,10 +78,32 @@ const ProfileSettingsScreen = () => {
     }));
   };
 
+  const handleImagePick = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        setFormData(prev => ({
+          ...prev,
+          image: result.assets[0].uri
+        }));
+      }
+    } catch (error) {
+      Alert.alert('Eroare', 'Nu am putut selecta imaginea. Vă rugăm să încercați din nou.');
+    }
+  };
+
   const handleUpdateProfile = async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem('token');
-      if (!token) {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!token || !userId) {
         throw new Error('Nu sunteți autentificat');
       }
 
@@ -81,32 +113,90 @@ const ProfileSettingsScreen = () => {
         return;
       }
 
-      const response = await fetch('http://10.0.2.2:5000/api/users/profile', {
+      // Verificăm dacă se încearcă modificarea email-ului sau parolei
+      if ((formData.email !== user.email || formData.newPassword) && !formData.currentPassword) {
+        Alert.alert('Eroare', 'Pentru a modifica email-ul sau parola, trebuie să introduceți parola curentă');
+        return;
+      }
+
+      const requestData = {
+        name: formData.name,
+        email: formData.email,
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword,
+      };
+
+      // Dacă imaginea a fost schimbată, o încărcăm în S3
+      if (formData.image && formData.image !== user.image) {
+        setUploadingImage(true);
+        const imageFormData = new FormData();
+        imageFormData.append('image', {
+          uri: formData.image,
+          type: 'image/jpeg',
+          name: 'user-image.jpg',
+        });
+
+        const uploadResponse = await fetch('http://13.60.13.114:5000/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+          body: imageFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Nu am putut încărca noua imagine');
+        }
+
+        const uploadData = await uploadResponse.json();
+        requestData.image = uploadData.imageUrl;
+        setUploadingImage(false);
+      }
+
+      const response = await fetch(`http://13.60.13.114:5000/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          currentPassword: formData.currentPassword,
-          newPassword: formData.newPassword,
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Eroare la actualizarea profilului');
+        throw new Error(data.message || 'Eroare la actualizarea profilului');
       }
+
+      // Actualizăm starea locală cu noile date
+      setUser(data.user);
+      setFormData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+        image: data.user.image,
+      }));
 
       Alert.alert('Succes', 'Profilul a fost actualizat cu succes');
       navigation.goBack();
     } catch (error) {
       Alert.alert('Eroare', error.message);
+    } finally {
+      setLoading(false);
+      setUploadingImage(false);
     }
   };
 
   const handleDeleteAccount = async () => {
+    // Verificăm dacă avem parola curentă
+    if (!formData.currentPassword) {
+      Alert.alert('Eroare', 'Trebuie să introduceți parola curentă pentru a șterge contul');
+      return;
+    }
+
     Alert.alert(
       'Ștergere cont',
       'Sigur doriți să ștergeți contul? Această acțiune nu poate fi anulată.',
@@ -121,26 +211,31 @@ const ProfileSettingsScreen = () => {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('token');
-              if (!token) {
+              const userId = await AsyncStorage.getItem('userId');
+              if (!token || !userId) {
                 throw new Error('Nu sunteți autentificat');
               }
 
-              const response = await fetch('http://10.0.2.2:5000/api/users/profile', {
+              const response = await fetch(`http://13.60.13.114:5000/api/users/${userId}`, {
                 method: 'DELETE',
                 headers: {
+                  'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}`,
                 },
+                body: JSON.stringify({ password: formData.currentPassword }),
               });
+
+              const data = await response.json();
 
               if (!response.ok) {
-                throw new Error('Eroare la ștergerea contului');
+                throw new Error(data.message || 'Eroare la ștergerea contului');
               }
 
-              await AsyncStorage.removeItem('token');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
+              // Ștergem token-ul și userId-ul
+              await AsyncStorage.multiRemove(['token', 'userId']);
+              
+              // Facem signout
+              await signOut();
             } catch (error) {
               Alert.alert('Eroare', error.message);
             }
@@ -164,6 +259,29 @@ const ProfileSettingsScreen = () => {
       </View>
 
       <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Imagine de profil</Text>
+          <TouchableOpacity 
+            style={styles.imageContainer}
+            onPress={handleImagePick}
+          >
+            {formData.image ? (
+              <Image 
+                source={{ uri: formData.image }} 
+                style={styles.profileImage} 
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Ionicons name="person" size={40} color="#94A3B8" />
+                <Text style={styles.placeholderText}>Adaugă poză</Text>
+              </View>
+            )}
+            <View style={styles.editOverlay}>
+              <Ionicons name="camera" size={24} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informații personale</Text>
           <View style={styles.formGroup}>
@@ -227,10 +345,18 @@ const ProfileSettingsScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.saveButton}
+          style={[styles.updateButton, (loading || uploadingImage) && styles.disabledButton]}
           onPress={handleUpdateProfile}
+          disabled={loading || uploadingImage}
         >
-          <Text style={styles.saveButtonText}>Salvează modificări</Text>
+          {loading || uploadingImage ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="save-outline" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+              <Text style={styles.updateButtonText}>Salvează Modificările</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -247,7 +373,7 @@ const ProfileSettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -261,8 +387,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#1F2937',
   },
   headerRight: {
@@ -305,33 +431,88 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    color: '#1F2937',
+    color: '#00000',
   },
-  saveButton: {
-    backgroundColor: '#2D3FE7',
-    borderRadius: 12,
-    padding: 16,
+  imageContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    marginVertical: 20,
+    alignSelf: 'center',
+    position: 'relative',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  placeholderImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  saveButtonText: {
+  placeholderText: {
+    color: '#94A3B8',
+    marginTop: 8,
+  },
+  editOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 8,
+    alignItems: 'center',
+  },
+  updateButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginHorizontal: 20,
+    marginBottom: 40,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(45, 63, 231, 0.3)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  updateButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FF2400',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginBottom: 40,
   },
   deleteButtonText: {
-    color: '#DC2626',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

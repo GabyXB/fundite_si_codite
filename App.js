@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View } from 'react-native';
+import Constants from 'expo-constants';
+import OperatorApp from './OperatorApp';
 
 // Screens
 import LoginScreen from './screens/LoginScreen';
@@ -19,7 +21,23 @@ import AppointmentDetailsScreen from './screens/AppointmentDetailsScreen';
 import HainuteScreen from './screens/HainuteScreen';
 import ProfileSettingsScreen from './screens/ProfileSettingsScreen';
 import AddPetScreen from './screens/AddPetScreen';
+import PetDetailsScreen from './screens/PetDetailsScreen';
 import HainaDetailsScreen from './screens/HainaDetailsScreen';
+import OrderHistoryScreen from './screens/OrderHistoryScreen';
+import OrderDetailsScreen from './screens/OrderDetailsScreen';
+import EditPetScreen from './screens/EditPetScreen';
+import ServiceScreen from './screens/ServiceScreen';
+import SpecificProductScreen from './screens/SpecificProductScreen';
+import GeneratedAIScreen from './screens/GeneratedAIScreen';
+import NewReviewScreen from './screens/NewReviewScreen';
+import SpecificReviewScreen from './screens/SpecificReviewScreen';
+import EditReviewScreen from './screens/EditReviewScreen';
+import MyReviewsScreen from './screens/MyReviewsScreen';
+
+
+
+
+
 
 // Context
 import AuthContext from './context/AuthContext';
@@ -40,7 +58,7 @@ const App = () => {
       console.log('Token găsit în AsyncStorage:', token ? 'Da' : 'Nu');
       
       if (token) {
-        const response = await fetch('http://localhost:5000/api/auth/verify-token', {
+        const response = await fetch('http://13.60.13.114:5000/api/auth/verify-token', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -90,45 +108,58 @@ const App = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2D3FE7" />
-      </View>
-    );
-  }
+  const appVariant = Constants?.expoConfig?.extra?.appVariant || Constants?.manifest?.extra?.appVariant || process.env.APP_VARIANT;
 
   return (
     <AuthContext.Provider value={{ signIn, signOut, isAuthenticated }}>
-      <NavigationContainer>
-        <Stack.Navigator 
-          screenOptions={{ headerShown: false }}
-          initialRouteName={isAuthenticated ? "Home" : "Login"}
-        >
-          {isAuthenticated ? (
-            <>
-              <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Appointments" component={AppointmentsScreen} />
-              <Stack.Screen name="NewAppointment" component={NewAppointmentScreen} />
-              <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
-              <Stack.Screen name="Products" component={ProductsScreen} />
-              <Stack.Screen name="Favorites" component={FavoritesScreen} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
-              <Stack.Screen name="Cart" component={CartScreen} />
-              <Stack.Screen name="Hainute" component={HainuteScreen} />
-              <Stack.Screen name="Reviews" component={ReviewsScreen} />
-              <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
-              <Stack.Screen name="AddPet" component={AddPetScreen} />
-              <Stack.Screen name="HainaDetails" component={HainaDetailsScreen} />
-            </>
-          ) : (
-            <>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} />
-            </>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
+      {appVariant === 'operator' ? (
+        <OperatorApp />
+      ) : isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#2D3FE7" />
+        </View>
+      ) : (
+        <NavigationContainer>
+          <Stack.Navigator 
+            screenOptions={{ headerShown: false }}
+            initialRouteName={isAuthenticated ? "Home" : "Login"}
+          >
+            {isAuthenticated ? (
+              <>
+                <Stack.Screen name="Home" component={HomeScreen} />
+                <Stack.Screen name="Appointments" component={AppointmentsScreen} />
+                <Stack.Screen name="NewAppointment" component={NewAppointmentScreen} />
+                <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
+                <Stack.Screen name="Products" component={ProductsScreen} />
+                <Stack.Screen name="Favorites" component={FavoritesScreen} />
+                <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen name="Cart" component={CartScreen} />
+                <Stack.Screen name="Hainute" component={HainuteScreen} />
+                <Stack.Screen name="Reviews" component={ReviewsScreen} />
+                <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
+                <Stack.Screen name="AddPet" component={AddPetScreen} />
+                <Stack.Screen name="HainaDetails" component={HainaDetailsScreen} />
+                <Stack.Screen name="PetDetails" component={PetDetailsScreen} />
+                <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
+                <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+                <Stack.Screen name="EditPet" component={EditPetScreen} />
+                <Stack.Screen name="SpecificProduct" component={SpecificProductScreen} />
+                <Stack.Screen name="Service" component={ServiceScreen} />
+                <Stack.Screen name="GeneratedAI" component={GeneratedAIScreen} />
+                <Stack.Screen name="NewReview" component={NewReviewScreen} />
+                <Stack.Screen name="SpecificReview" component={SpecificReviewScreen} />
+                <Stack.Screen name="EditReviewScreen" component={EditReviewScreen} />
+                <Stack.Screen name="MyReviewsScreen" component={MyReviewsScreen} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      )}
     </AuthContext.Provider>
   );
 };

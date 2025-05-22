@@ -9,14 +9,19 @@ import {
   Platform,
   ScrollView,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../context/AuthContext';
+import { fontStyles, createTextStyle } from '../utils/fontSizes';
+import { moderateScale } from 'react-native-size-matters';
 
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
 import TextLink from '../components/TextLink';
+import { colors, shadows, neumorphic } from '../utils/theme';
+
 
 const LoginScreen = () => {
   const navigation = useNavigation();
@@ -75,10 +80,12 @@ const LoginScreen = () => {
     }
 
     try {
-      const response = await fetch('http://13.60.32.137:5000/api/auth/login', {
+      console.log('Începe request-ul de login...');
+      const response = await fetch('http://13.60.13.114:5000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           email,
@@ -86,7 +93,9 @@ const LoginScreen = () => {
         }),
       });
 
+      console.log('Status răspuns:', response.status);
       const data = await response.json();
+      console.log('Răspuns primit:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Eroare la autentificare');
@@ -121,6 +130,11 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={true}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -216,7 +230,8 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F3FF',
+    backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -226,7 +241,7 @@ const styles = StyleSheet.create({
   },
   topSection: {
     height: 260,
-    backgroundColor: '#F0F3FF',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -284,21 +299,19 @@ const styles = StyleSheet.create({
     }),
   },
   title: {
-    fontSize: 28,
+    fontSize: moderateScale(32),
     fontWeight: '700',
-    color: '#424874',
+    color: colors.title,
     marginBottom: 8,
-    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: moderateScale(16),
+    color: colors.text,
     marginBottom: 32,
-    letterSpacing: 0.3,
   },
   errorText: {
+    fontSize: moderateScale(14),
     color: '#FF3B30',
-    fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -310,8 +323,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   forgotPasswordText: {
-    color: '#424874',
-    fontSize: 14,
+    fontSize: moderateScale(14),
+    color: colors.primary,
     fontWeight: '600',
   },
   loginButton: {
@@ -341,13 +354,23 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   registerText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: '#666',
   },
   registerLink: {
-    fontSize: 14,
-    color: '#424874',
+    fontSize: moderateScale(14),
+    color: colors.primary,
     fontWeight: '600',
+  },
+  input: {
+    fontSize: moderateScale(16),
+    color: colors.text,
+    padding: moderateScale(16),
+  },
+  buttonText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: colors.background,
   },
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,37 +6,77 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../utils/theme';
+
+const SIZE_LABELS = {
+  '1': 'Foarte mic',
+  '2': 'Mic',
+  '3': 'Mediu',
+  '4': 'Mare',
+  '5': 'Foarte mare'
+};
 
 const PetCard = ({ pet, onPress }) => {
+  const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleImageError = (error) => {
+    console.error('Error loading image:', error.nativeEvent.error);
+    setImageError(true);
+    setIsLoading(false);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <Image
-        source={{ uri: pet.image || 'https://via.placeholder.com/64' }}
-        style={styles.petImage}
-      />
-      <View style={styles.petInfo}>
-        <Text style={styles.petName}>{pet.name}</Text>
-        <Text style={styles.petSpecies}>{pet.specie}</Text>
-        <View style={styles.petDetails}>
+    <TouchableOpacity style={styles.container} onPress={onPress}>
+      <View style={styles.imageContainer}>
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        )}
+        <Image
+          source={{ 
+            uri: imageError ? 'https://via.placeholder.com/150' : pet.image,
+            cache: 'force-cache'
+          }}
+          style={[styles.image, isLoading && styles.hiddenImage]}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+        />
+      </View>
+      <View style={styles.info}>
+        <Text style={styles.name}>{pet.name}</Text>
+        <View style={styles.details}>
           <View style={styles.detailItem}>
-            <Ionicons name="paw" size={16} color="#FFC107" />
-            <Text style={styles.detailText}>{pet.age || 'N/A'} ani</Text>
+            <Ionicons name="paw" size={16} color={colors.primary} />
+            <Text style={styles.detailText}>{pet.specie}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Ionicons name="paw" size={16} color="#94A3B8" />
-            <Text style={styles.detailText}>Talie: {pet.talie || 'N/A'}</Text>
+            <Ionicons name="calendar" size={16} color={colors.primary} />
+            <Text style={styles.detailText}>{pet.age} ani</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="resize" size={16} color={colors.primary} />
+            <Text style={styles.detailText}>{SIZE_LABELS[pet.talie] || 'Necunoscută'}</Text>
           </View>
         </View>
       </View>
+      <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  container: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
@@ -53,38 +93,53 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  petImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  imageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+    backgroundColor: '#F8FAFF',
+    overflow: 'hidden',
+    position: 'relative',
   },
-  petInfo: {
-    marginLeft: 16,
+  image: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+  },
+  hiddenImage: {
+    opacity: 0,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFF',
+  },
+  info: {
     flex: 1,
   },
-  petName: {
+  name: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
+    marginBottom: 8,
   },
-  petSpecies: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  petDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+  details: {
+    gap: 4,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   detailText: {
-    marginLeft: 4,
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#64748B',
   },
 });
 

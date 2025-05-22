@@ -12,13 +12,15 @@ import {
   Platform,
   Alert,
   Modal,
-  FlatList
+  FlatList,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AuthContext from '../context/AuthContext';
 import BottomNavigation from '../components/BottomNavigation';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { colors, shadows, neumorphic } from '../utils/theme';
 
 const { width: viewportWidth } = Dimensions.get('window');
 
@@ -30,90 +32,209 @@ const HainaDetailsScreen = ({ route, navigation }) => {
   const [pets, setPets] = useState([]);
   const [selectPetModal, setSelectPetModal] = useState(false);
   const [selectedPet, setSelectedPet] = useState(null);
+  const [imagePreviewModal, setImagePreviewModal] = useState(false);
 
-  // Fetch pets la mount
-  useEffect(() => {
-    const fetchPets = async () => {
-      try {
-        setLoading(true);
-        const token = await AsyncStorage.getItem('token');
-        if (!token) return;
-        const response = await fetch('http://13.60.32.137:5000/api/pets/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await response.json();
-        setPets(data);
-      } catch (err) {
-        setPets([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPets();
-  }, []);
+  // Refresh data when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        try {
+          setLoading(true);
+          const token = await AsyncStorage.getItem('token');
+          if (!token) return;
+          
+          // Fetch updated haina data
+          const response = await fetch(`http://13.60.13.114:5000/api/haine/${haina.id}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          const updatedHaina = await response.json();
+          
+          // Update the haina object with new data
+          Object.assign(haina, updatedHaina);
+          
+          // Fetch pets
+          const petsResponse = await fetch('http://13.60.13.114:5000/api/pets/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          const petsData = await petsResponse.json();
+          setPets(petsData);
+        } catch (err) {
+          console.error('Error fetching data:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }, [])
+  );
 
   const handleTryOnPet = () => {
     setSelectPetModal(true);
   };
 
   const handlePetSelect = async (pet) => {
-    setSelectedPet(pet);
-    setSelectPetModal(false);
-    // Deschide picker-ul de imagine
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setGenerating(true);
-      try {
-        const animalImageUri = result.assets[0].uri;
-        const hainaImageUri = haina.imagini?.[0] || haina.imagine;
-        const formData = new FormData();
-        formData.append('animal', {
-          uri: animalImageUri,
-          name: 'animal.jpg',
-          type: 'image/jpeg',
-        });
-        formData.append('haina', {
-          uri: hainaImageUri,
-          name: 'haina.jpg',
-          type: 'image/jpeg',
-        });
-        formData.append('prompt', 'imbraca animalul acesta cu haina aceasta astfel incat sa obtin o imagine apropriata cu cea a animalului');
-        const response = await fetch('https://13.60.32.137:5000/tryon', {
-          method: 'POST',
-          body: formData,
+    try {
+      setSelectedPet(pet);
+      setSelectPetModal(false);
+      
+      // Deschide picker-ul de imagine
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Obținem token-ul pentru autentificare
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          Alert.alert('Eroare', 'Nu sunteți autentificat');
+          return;
+        }
+
+        // Fetch pets pentru a ne asigura că avem datele actualizate
+        const petsResponse = await fetch('http://13.60.13.114:5000/api/pets/me', {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`,
           },
         });
-        const data = await response.json();
-        setGeneratedImage(data.link);
-        // Trimite linkul la backend pentru asociere cu pet-ul
-        await fetch('https://13.60.32.137:5000/api/imagini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pet_id: pet.id,
-            user_id: null,
-            link: data.link,
-          }),
+
+        if (!petsResponse.ok) {
+          throw new Error('Eroare la încărcarea animalelor');
+        }
+
+        const petsData = await petsResponse.json();
+        setPets(petsData);
+
+        // Navigăm către ecranul GeneratedAI cu imaginea generată și numele hainei
+        navigation.navigate('GeneratedAI', {
+          imagine_gen: haina.imagine_gen,
+          nume: haina.nume
         });
-        Alert.alert('Succes', 'Imaginea a fost generată și salvată!');
-      } catch (err) {
-        Alert.alert('Eroare', 'A apărut o eroare la generarea imaginii.');
-      } finally {
-        setGenerating(false);
       }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Eroare', 'A apărut o eroare la procesarea cererii');
     }
   };
 
   const handleAddToCart = () => {
     Alert.alert('Succes', 'Produsul a fost adăugat în coș!');
+  };
+
+  const handleImageSelect = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        const selectedImage = result.assets[0];
+        
+        // Creăm un obiect File din URI-ul imaginii
+        const response = await fetch(selectedImage.uri);
+        const blob = await response.blob();
+        const filename = selectedImage.uri.split('/').pop();
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+
+        // Încărcăm imaginea în S3
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const token = await AsyncStorage.getItem('token');
+        const uploadResponse = await fetch('http://13.60.13.114:5000/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const uploadData = await uploadResponse.json();
+        if (uploadData.success) {
+          // Actualizăm imaginea în state cu URL-ul din S3
+          setHaina(prev => ({
+            ...prev,
+            imagine: uploadData.imageUrl
+          }));
+        } else {
+          throw new Error(uploadData.error || 'Eroare la încărcarea imaginii');
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la selectarea/încărcarea imaginii:', error);
+      Alert.alert('Eroare', 'Nu am putut încărca imaginea. Vă rugăm să încercați din nou.');
+    }
+  };
+
+  const handleUploadToS3 = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        const selectedImage = result.assets[0];
+        console.log('Selected image URI:', selectedImage.uri);
+        
+        // Creăm FormData și adăugăm imaginea direct din URI
+        const formData = new FormData();
+        const imageData = {
+          uri: Platform.OS === 'ios' ? selectedImage.uri.replace('file://', '') : selectedImage.uri,
+          type: 'image/jpeg',
+          name: 'image.jpg'
+        };
+        console.log('Image data being sent:', imageData);
+        formData.append('image', imageData);
+
+        const token = await AsyncStorage.getItem('token');
+        console.log('Token available:', !!token);
+        
+        const uploadResponse = await fetch('http://13.60.13.114:5000/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+          body: formData,
+        });
+
+        console.log('Upload response status:', uploadResponse.status);
+        
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('Server response:', errorText);
+          throw new Error('Eroare la încărcarea imaginii');
+        }
+
+        const uploadData = await uploadResponse.json();
+        console.log('Upload response data:', uploadData);
+        
+        if (uploadData.success) {
+          Alert.alert('Succes', 'Imaginea a fost încărcată cu succes în S3!');
+          console.log('URL imagine S3:', uploadData.imageUrl);
+        } else {
+          throw new Error(uploadData.error || 'Eroare la încărcarea imaginii');
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea imaginii în S3:', error);
+      Alert.alert('Eroare', 'Nu am putut încărca imaginea în S3. Vă rugăm să încercați din nou.');
+    }
+  };
+
+  const handleImagePress = () => {
+    setImagePreviewModal(true);
   };
 
   if (loading) {
@@ -126,7 +247,16 @@ const HainaDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={true}
+      />
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.imageContainer}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -136,11 +266,48 @@ const HainaDetailsScreen = ({ route, navigation }) => {
               <Ionicons name="arrow-back" size={24} color="#1E293B" />
             </View>
           </TouchableOpacity>
-          <Image 
-            source={haina.imagine ? { uri: haina.imagine } : { uri: 'https://placehold.co/400x400/2D3FE7/FFFFFF/png?text=Haină' }}
-            style={styles.image} 
-          />
+          <TouchableOpacity 
+            style={styles.imageWrapper} 
+            onPress={handleImagePress}
+          >
+            {(haina.imagine) ? (
+              <Image 
+                source={{ uri: haina.imagine }} 
+                style={styles.hainaImage} 
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Ionicons name="image-outline" size={40} color="#94A3B8" />
+                <Text style={styles.placeholderText}>Adaugă o imagine</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* Image Preview Modal */}
+        <Modal
+          visible={imagePreviewModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImagePreviewModal(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              style={styles.modalBackButton}
+              onPress={() => setImagePreviewModal(false)}
+            >
+              <View style={styles.modalBackButtonCircle}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+            <Image 
+              source={{ uri: haina.imagine }} 
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
 
         {/* Modal pentru selectarea pet-ului */}
         <Modal
@@ -214,6 +381,24 @@ const HainaDetailsScreen = ({ route, navigation }) => {
             <Text style={styles.details}>{haina.marime}</Text>
           </View>
 
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="cube-outline" size={20} color="#64748B" />
+              <Text style={styles.sectionTitle}>Cantitate disponibilă</Text>
+            </View>
+            <Text style={styles.details}>{haina.cantitate} bucăți</Text>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="document-text-outline" size={20} color="#64748B" />
+              <Text style={styles.sectionTitle}>Detalii</Text>
+            </View>
+            <Text style={styles.details}>{haina.detalii}</Text>
+          </View>
+
+          
+
           <View style={styles.buttonsContainer}>
             <TouchableOpacity 
               style={styles.tryOnButton}
@@ -233,7 +418,6 @@ const HainaDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
-
       <BottomNavigation />
     </SafeAreaView>
   );
@@ -242,7 +426,8 @@ const HainaDetailsScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   loadingContainer: {
     flex: 1,
@@ -252,6 +437,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 80, // Spațiu pentru BottomNavigation
   },
   imageContainer: {
     width: viewportWidth,
@@ -284,10 +472,26 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  image: {
+  imageWrapper: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hainaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#94A3B8',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   detailsContainer: {
     padding: 24,
@@ -319,7 +523,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3FE7',
+    color: colors.primary,
   },
   section: {
     marginBottom: 24,
@@ -359,7 +563,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tryOnButton: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 12,
     flexDirection: 'row',
@@ -399,6 +603,66 @@ const styles = StyleSheet.create({
     color: '#2D3FE7',
     fontSize: 16,
     fontWeight: '600',
+  },
+  uploadButton: {
+    backgroundColor: '#10B981',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(16, 185, 129, 0.3)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  uploadButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 20,
+    zIndex: 1,
+  },
+  modalBackButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginLeft: 16,
   },
 });
 

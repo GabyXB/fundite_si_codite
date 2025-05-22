@@ -125,7 +125,11 @@ const FavoritesScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {activeTab === 'products' ? (
           favoriteProducts.map(renderProductCard)
         ) : (
@@ -180,9 +184,11 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#FFFFFF',
   },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    paddingBottom: 80, // Spațiu pentru BottomNavigation
   },
   productCard: {
     flexDirection: 'row',

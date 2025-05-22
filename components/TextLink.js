@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { colors } from '../utils/theme';
 
 const TextLink = ({ text, onPress, style }) => {
   return (
@@ -11,7 +12,7 @@ const TextLink = ({ text, onPress, style }) => {
 
 const styles = StyleSheet.create({
   text: {
-    color: '#007AFF',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '500',
   },

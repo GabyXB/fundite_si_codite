@@ -9,11 +9,27 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 
 const BottomNavigation = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const currentScreen = route.name;
+  const insets = useSafeAreaInsets();
+
+  React.useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setVisibilityAsync('hidden');
+      NavigationBar.setBehaviorAsync('overlay-swipe');
+    }
+    return () => {
+      if (Platform.OS === 'android') {
+        NavigationBar.setVisibilityAsync('visible');
+      }
+    };
+  }, []);
 
   const navigateToScreen = (screenName) => {
     navigation.navigate(screenName);
@@ -34,11 +50,11 @@ const BottomNavigation = () => {
   };
 
   const getIconColor = (screenName) => {
-    return currentScreen === screenName ? '#2D3FE7' : '#94A3B8';
+    return currentScreen === screenName ? colors.primary : colors.text;
   };
 
   return (
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav, { paddingBottom: insets.bottom || (Platform.OS === 'ios' ? 24 : 12) }]}>
       <TouchableOpacity 
         style={getNavItemStyle('Home')}
         onPress={() => navigateToScreen('Home')}
@@ -72,7 +88,7 @@ const BottomNavigation = () => {
         onPress={() => navigateToScreen('Reviews')}
       >
         <Ionicons name="star-outline" size={24} color={getIconColor('Reviews')} />
-        <Text style={getTextStyle('Reviews')}>Reviews</Text>
+        <Text style={getTextStyle('Reviews')}>Recenzii</Text>
       </TouchableOpacity>
     </View>
   );
@@ -85,7 +101,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     position: 'absolute',
@@ -95,13 +111,16 @@ const styles = StyleSheet.create({
     width: '100%',
     ...Platform.select({
       ios: {
-        shadowColor: 'rgba(149, 157, 165, 0.1)',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 1,
-        shadowRadius: 16,
+        shadowColor: colors.secondary,
+        shadowOffset: {
+          width: 0,
+          height: -4,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 8,
+        elevation: 4,
       },
     }),
   },
@@ -113,15 +132,15 @@ const styles = StyleSheet.create({
     maxWidth: Dimensions.get('window').width / 5,
   },
   activeNavItem: {
-    color: '#2D3FE7',
+    color: colors.primary,
   },
   navText: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: colors.text,
     marginTop: 4,
   },
   activeNavText: {
-    color: '#2D3FE7',
+    color: colors.primary,
     fontWeight: '600',
   },
 });

@@ -8,11 +8,18 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  Image,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from '../components/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { colors, shadows, neumorphic } from '../utils/theme';
+import { moderateScale } from 'react-native-size-matters';
+
+ 
 
 const AppointmentsScreen = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
@@ -21,9 +28,11 @@ const AppointmentsScreen = () => {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAppointments();
+    }, [])
+  );
 
   const fetchAppointments = async () => {
     try {
@@ -35,7 +44,7 @@ const AppointmentsScreen = () => {
         return;
       }
 
-      const response = await fetch(`http://13.60.32.137:5000/api/programari/user/${userId}`, {
+      const response = await fetch(`http://13.60.13.114:5000/api/programari/user/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -135,7 +144,7 @@ const AppointmentsScreen = () => {
     };
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={appointment.id} 
         style={styles.appointmentCard}
         onPress={() => navigation.navigate('AppointmentDetails', { appointmentId: appointment.id })}
@@ -143,7 +152,7 @@ const AppointmentsScreen = () => {
         <View style={styles.appointmentHeader}>
           <View style={styles.petInfo}>
             <View style={styles.petIconContainer}>
-              <Ionicons name="paw" size={24} color="#2D3FE7" />
+              <Ionicons name="paw" size={24} color={colors.primary} />
             </View>
             <View>
               <Text style={styles.petName}>{appointment.petName}</Text>
@@ -174,7 +183,7 @@ const AppointmentsScreen = () => {
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="time-outline" size={20} color="#94A3B8" />
-            <Text style={styles.detailText}>Durată: {appointment.duration} minute</Text>
+            <Text style={styles.detailText}>Durată: {appointment.durata} minute</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -183,52 +192,64 @@ const AppointmentsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Programările Mele</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={handleAddAppointment}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={true}
+      />
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerHomeLike}>
+          <Text style={styles.titleHomeLike}>Programările Mele</Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={handleAddAppointment}
+          >
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
-          onPress={() => setActiveTab('upcoming')}
-        >
-          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
-            Următoare
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'past' && styles.activeTab]}
-          onPress={() => setActiveTab('past')}
-        >
-          <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
-            Anterioare
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
+            onPress={() => setActiveTab('upcoming')}
+          >
+            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
+              Următoare
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'past' && styles.activeTab]}
+            onPress={() => setActiveTab('past')}
+          >
+            <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
+              Anterioare
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      <ScrollView style={styles.content}>
-        {loading ? (
-          <Text style={styles.loadingText}>Se încarcă programările...</Text>
-        ) : activeTab === 'upcoming' ? (
-          upcomingAppointments.length > 0 ? (
-            upcomingAppointments.map(renderAppointmentCard)
+        <ScrollView style={styles.content}>
+          {loading ? (
+            <Text style={styles.loadingText}>Se încarcă programările...</Text>
+          ) : activeTab === 'upcoming' ? (
+            upcomingAppointments.length > 0 ? (
+              upcomingAppointments.map(renderAppointmentCard)
+            ) : (
+              <Text style={styles.noAppointmentsText}>Nu ai programări viitoare</Text>
+            )
+          ) : pastAppointments.length > 0 ? (
+            pastAppointments.map(renderAppointmentCard)
           ) : (
-            <Text style={styles.noAppointmentsText}>Nu ai programări viitoare</Text>
-          )
-        ) : pastAppointments.length > 0 ? (
-          pastAppointments.map(renderAppointmentCard)
-        ) : (
-          <Text style={styles.noAppointmentsText}>Nu ai programări anterioare</Text>
-        )}
+            <Text style={styles.noAppointmentsText}>Nu ai programări anterioare</Text>
+          )}
+        </ScrollView>
       </ScrollView>
-
-      <BottomNavigation />
+      <View style={styles.bottomNavContainer}>
+        <BottomNavigation />
+      </View>
     </SafeAreaView>
   );
 };
@@ -236,26 +257,48 @@ const AppointmentsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  header: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100, // Mărim padding-ul pentru a evita suprapunerea cu BottomNavigation
+  },
+  headerHomeLike: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingTop: Platform.OS === 'ios' ? 10 : 15,
     paddingBottom: 20,
+    backgroundColor: '#fff',
+    marginBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.secondary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  title: {
-    fontSize: 24,
+  titleHomeLike: {
+    fontSize: moderateScale(24),
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.primary,
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -273,7 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   activeTab: {
-    backgroundColor: '#2D3FE7',
+    backgroundColor: colors.primary,
   },
   tabText: {
     fontSize: 16,
@@ -318,7 +361,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E8F0FE',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -344,7 +387,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   appointmentDetails: {
-    backgroundColor: '#F8FAFF',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 12,
   },
@@ -356,7 +399,7 @@ const styles = StyleSheet.create({
   detailText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#64748B',
+    color: '#00000',
   },
   loadingText: {
     flex: 1,
@@ -371,6 +414,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
     color: '#94A3B8',
+  },
+  bottomNavContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
   },
 });
 
