@@ -372,7 +372,7 @@
 
 ## Alte observații
 
-- Toate fetch-urile către backend folosesc token JWT din AsyncStorage.
+- Aproximativ toate fetch-urile către backend folosesc token JWT din AsyncStorage.
 - Navigarea și starea aplicației sunt gestionate modern, cu hooks și context.
 - Designul este responsive, cu accent pe UX, animații și feedback vizual.
 - Codul este structurat pe module, ușor de extins și întreținut. 
