@@ -5,7 +5,7 @@ module.exports = ({ config }) => {
   let appVariant = 'main'; //main e cealalta
   if (APP_VARIANT === 'operator') {
     name = 'OperatorApp';
-    appVariant = 'operator';
+    appVariant = 'main';
   }
   return {
     ...config,
