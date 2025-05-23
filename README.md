@@ -22,6 +22,6 @@ Te rugăm să-l consulți pentru detalii tehnice și instrucțiuni de utilizare.
 
 ## 🚀 Pornire rapidă
 
-Asigură-te că ai instalat Node.js , Expo CLI si dependentele folosim npm install, apoi:
+Asigură-te că ai instalat Node.js , Expo CLI si dependentele folosind npm install, apoi:
 ```bash
 npx expo start
