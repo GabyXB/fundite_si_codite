@@ -33,11 +33,8 @@ import NewReviewScreen from './screens/NewReviewScreen';
 import SpecificReviewScreen from './screens/SpecificReviewScreen';
 import EditReviewScreen from './screens/EditReviewScreen';
 import MyReviewsScreen from './screens/MyReviewsScreen';
-
-
-
-
-
+import PoliticaConfScreen from './screens/PoliticaConfScreen';
+import TermeniSiConditiiScreen from './screens/TermeniSiConditiiScreen';
 
 // Context
 import AuthContext from './context/AuthContext';
@@ -150,11 +147,15 @@ const App = () => {
                 <Stack.Screen name="SpecificReview" component={SpecificReviewScreen} />
                 <Stack.Screen name="EditReviewScreen" component={EditReviewScreen} />
                 <Stack.Screen name="MyReviewsScreen" component={MyReviewsScreen} />
+                <Stack.Screen name="PoliticaConf" component={PoliticaConfScreen} />
+                <Stack.Screen name="TermeniSiConditii" component={TermeniSiConditiiScreen} />
               </>
             ) : (
               <>
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Register" component={RegisterScreen} />
+                <Stack.Screen name="PoliticaConf" component={PoliticaConfScreen} />
+                <Stack.Screen name="TermeniSiConditii" component={TermeniSiConditiiScreen} />
               </>
             )}
           </Stack.Navigator>

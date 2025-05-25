@@ -86,6 +86,8 @@ const SpecificServiceScreenOperator = () => {
           <Text style={styles.value}>{service.nume}</Text>
           <Text style={styles.label}>Preț:</Text>
           <Text style={styles.value}>{service.pret} lei</Text>
+          <Text style={styles.label}>Categorie:</Text>
+          <Text style={styles.value}>{service.categorie}</Text>
           <Text style={styles.label}>Detalii:</Text>
           <Text style={styles.value}>{service.detalii}</Text>
         </View>

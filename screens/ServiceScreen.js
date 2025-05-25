@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../context/AuthContext';
@@ -31,6 +32,7 @@ const ServiceScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [imagePreviewModal, setImagePreviewModal] = useState(false);
 
   const fetchServiceDetails = async () => {
     try {
@@ -137,11 +139,17 @@ const ServiceScreen = () => {
         </View>
 
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: service.imagine || 'https://via.placeholder.com/400' }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.imageTouchable}
+            onPress={() => setImagePreviewModal(true)}
+          >
+            <Image
+              source={{ uri: service.imagine || 'https://via.placeholder.com/400' }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.detailsContainer}>
@@ -165,6 +173,12 @@ const ServiceScreen = () => {
           </View>
         </View>
 
+        {/* Spatiu pentru a nu fi acoperit de butonul absolut */}
+        <View style={{ height: 80 }} />
+      </ScrollView>
+
+      {/* Buton programare absolut */}
+      <View style={styles.absoluteButtonContainer}>
         <TouchableOpacity
           style={styles.scheduleButton}
           onPress={() => navigation.navigate('NewAppointment', { service })}
@@ -172,7 +186,32 @@ const ServiceScreen = () => {
           <Ionicons name="calendar-outline" size={24} color="#FFFFFF" style={styles.buttonIcon} />
           <Text style={styles.scheduleButtonText}>Programează-te</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      {/* Modal imagine zoom */}
+      <Modal
+        visible={imagePreviewModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImagePreviewModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity 
+            style={styles.modalBackButton}
+            onPress={() => setImagePreviewModal(false)}
+          >
+            <View style={styles.modalBackButtonCircle}>
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+          <Image 
+            source={{ uri: service.imagine || 'https://via.placeholder.com/400' }} 
+            style={styles.modalImage}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
+
       <BottomNavigation />
     </SafeAreaView>
   );
@@ -225,12 +264,24 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   imageContainer: {
-    height: 300,
-    position: 'relative',
+    width: '100%',
+    aspectRatio: 16/9,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    marginBottom: -24,
+  },
+  imageTouchable: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   image: {
     width: '100%',
     height: '100%',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
   detailsContainer: {
     padding: 20,
@@ -275,8 +326,7 @@ const styles = StyleSheet.create({
   specificationsContainer: {
     padding: 20,
     backgroundColor: '#FFFFFF',
-    marginTop: 16,
-    marginBottom: 100,
+    marginBottom: 50,
   },
   sectionTitle: {
     fontSize: 18,
@@ -356,6 +406,40 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  absoluteButtonContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 60,
+    alignItems: 'center',
+    zIndex: 10,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 20,
+    zIndex: 1,
+  },
+  modalBackButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

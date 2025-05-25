@@ -27,7 +27,7 @@ import { moderateScale } from 'react-native-size-matters';
 const ProductsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { category } = route.params || { category: 'all' };
+  const { category, tab } = route.params || { category: 'all', tab: undefined };
   const { signOut } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
@@ -41,6 +41,8 @@ const ProductsScreen = () => {
   const [categories, setCategories] = useState([]);
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [showPriceSort, setShowPriceSort] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState([]);
+  const [productCategories, setProductCategories] = useState([]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -65,9 +67,52 @@ const ProductsScreen = () => {
 
   useEffect(() => {
     // Extragem categoriile unice din produse
+    const uniqueProductCategories = [...new Set(products.map(p => p.categorie))];
+    setProductCategories(['all', ...uniqueProductCategories]);
+  }, [products]);
+
+  useEffect(() => {
+    // Extragem categoriile unice din servicii
+    const uniqueServiceCategories = [...new Set(services.map(s => s.categorie))];
+    setServiceCategories(['all', ...uniqueServiceCategories]);
+  }, [services]);
+
+  useEffect(() => {
+    // La schimbarea tab-ului, daca selectedCategory nu exista in lista, resetez la 'all'
+    if (activeTab === 'products') {
+      if (!productCategories.includes(selectedCategory)) {
+        setSelectedCategory('all');
+      }
+    } else if (activeTab === 'services') {
+      if (!serviceCategories.includes(selectedCategory)) {
+        setSelectedCategory('all');
+      }
+    }
+  }, [activeTab, productCategories, serviceCategories]);
+
+  useEffect(() => {
+    // Extragem categoriile unice din produse
     const uniqueCategories = [...new Set(products.map(p => p.categorie))];
     setCategories(['all', ...uniqueCategories]);
   }, [products]);
+
+  useEffect(() => {
+    if (tab && (tab === 'services' || tab === 'products')) {
+      setActiveTab(tab);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    if (category && category !== 'all') {
+      if (activeTab === 'products' && productCategories.includes(category)) {
+        setSelectedCategory(category);
+      } else if (activeTab === 'services' && serviceCategories.includes(category)) {
+        setSelectedCategory(category);
+      } else {
+        setSelectedCategory('all');
+      }
+    }
+  }, [category, activeTab, productCategories, serviceCategories]);
 
   const fetchProducts = async () => {
     try {
@@ -264,24 +309,34 @@ const ProductsScreen = () => {
     let filteredProducts = products.filter(product =>
       product.nume.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    
     if (selectedCategory !== 'all') {
       filteredProducts = filteredProducts.filter(p => p.categorie === selectedCategory);
     }
-    
     if (sortOrder !== 'none') {
       filteredProducts.sort((a, b) => {
         return sortOrder === 'asc' ? a.pret - b.pret : b.pret - a.pret;
       });
     }
-    
     return filteredProducts;
+  };
+
+  const getFilteredServices = () => {
+    let filtered = services.filter(service =>
+      service.nume.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(s => s.categorie === selectedCategory);
+    }
+    return filtered;
   };
 
   const renderFilterButtons = () => (
     <View style={styles.filterButtonsContainer}>
       <TouchableOpacity
-        style={[styles.filterButton, showCategoryFilter && styles.filterButtonActive]}
+        style={[
+          styles.filterButton,
+          (showCategoryFilter || selectedCategory !== 'all') && styles.filterButtonActive
+        ]}
         onPress={() => {
           setShowCategoryFilter(!showCategoryFilter);
           setShowPriceSort(false);
@@ -290,18 +345,21 @@ const ProductsScreen = () => {
         <Ionicons 
           name="filter" 
           size={20} 
-          color={showCategoryFilter ? '#fff' : '#666'} 
+          color={showCategoryFilter || selectedCategory !== 'all' ? '#fff' : '#666'} 
         />
         <Text style={[
           styles.filterButtonText,
-          showCategoryFilter && styles.filterButtonTextActive
+          (showCategoryFilter || selectedCategory !== 'all') && styles.filterButtonTextActive
         ]}>
           Filtrare
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.filterButton, showPriceSort && styles.filterButtonActive]}
+        style={[
+          styles.filterButton,
+          (showPriceSort || sortOrder !== 'none') && styles.filterButtonActive
+        ]}
         onPress={() => {
           setShowPriceSort(!showPriceSort);
           setShowCategoryFilter(false);
@@ -310,11 +368,11 @@ const ProductsScreen = () => {
         <Ionicons 
           name="swap-vertical" 
           size={20} 
-          color={showPriceSort ? '#fff' : '#666'} 
+          color={showPriceSort || sortOrder !== 'none' ? '#fff' : '#666'} 
         />
         <Text style={[
           styles.filterButtonText,
-          showPriceSort && styles.filterButtonTextActive
+          (showPriceSort || sortOrder !== 'none') && styles.filterButtonTextActive
         ]}>
           Sortare
         </Text>
@@ -322,32 +380,39 @@ const ProductsScreen = () => {
     </View>
   );
 
-  const renderCategoryOptions = () => (
-    <View style={styles.optionsContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {categories.filter(cat => cat !== 'all').map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            style={[
-              styles.optionButton,
-              selectedCategory === cat && styles.optionButtonActive
-            ]}
-            onPress={() => {
-              setSelectedCategory(cat);
-              setShowCategoryFilter(false);
-            }}
-          >
-            <Text style={[
-              styles.optionButtonText,
-              selectedCategory === cat && styles.optionButtonTextActive
-            ]}>
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+  const renderCategoryOptions = () => {
+    const cats = activeTab === 'products' ? productCategories : serviceCategories;
+    return (
+      <View style={styles.optionsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {cats.filter(cat => cat !== 'all').map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.optionButton,
+                selectedCategory === cat && selectedCategory !== 'all' && styles.optionButtonActive
+              ]}
+              onPress={() => {
+                if (selectedCategory === cat) {
+                  setSelectedCategory('all');
+                } else {
+                  setSelectedCategory(cat);
+                }
+                setShowCategoryFilter(false);
+              }}
+            >
+              <Text style={[
+                styles.optionButtonText,
+                selectedCategory === cat && selectedCategory !== 'all' && styles.optionButtonTextActive
+              ]}>
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderSortOptions = () => (
     <View style={styles.optionsContainer}>
@@ -390,9 +455,7 @@ const ProductsScreen = () => {
   );
 
   const filteredProducts = getFilteredAndSortedProducts();
-  const filteredServices = services.filter(service =>
-    service.nume.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredServices = getFilteredServices();
 
   const renderProductCard = (product) => (
     <TouchableOpacity 
@@ -472,10 +535,7 @@ const ProductsScreen = () => {
       >
         <View style={styles.headerHomeLike}>
           <Text style={styles.titleHomeLike}>
-            {category === 'grooming' ? 'Grooming' :
-             category === 'styling' ? 'Styling' :
-             category === 'health' ? 'Health' :
-             category === 'spa' ? 'Spa' : 'Toate Produsele'}
+            {activeTab === 'services' ? 'Servicii' : 'Produse'}
           </Text>
           <TouchableOpacity
             style={styles.cartButtonHomeLike}
@@ -494,7 +554,7 @@ const ProductsScreen = () => {
           <Ionicons name="search-outline" size={20} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Caută produse sau servicii..."
+            placeholder={activeTab === 'services' ? "Caută servicii..." : "Caută produse..."}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#94A3B8"
@@ -520,31 +580,25 @@ const ProductsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'products' && (
-          <>
-            {renderFilterButtons()}
-            {showCategoryFilter && renderCategoryOptions()}
-            {showPriceSort && renderSortOptions()}
-          </>
-        )}
+        {renderFilterButtons()}
+        {showCategoryFilter && renderCategoryOptions()}
+        {showPriceSort && renderSortOptions()}
 
-        <ScrollView 
-          style={styles.content}
-        >
+        <ScrollView style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <Text>Se încarcă...</Text>
             </View>
           ) : activeTab === 'products' ? (
-            filteredProducts.length > 0 ? (
-              filteredProducts.map(renderProductCard)
+            getFilteredAndSortedProducts().length > 0 ? (
+              getFilteredAndSortedProducts().map(renderProductCard)
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>Nu există produse în această categorie</Text>
               </View>
             )
-          ) : filteredServices.length > 0 ? (
-            filteredServices.map(renderServiceCard)
+          ) : getFilteredServices().length > 0 ? (
+            getFilteredServices().map(renderServiceCard)
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Nu există servicii în această categorie</Text>
@@ -650,7 +704,6 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 20,
   },
   tab: {
     flex: 1,

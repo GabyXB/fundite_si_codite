@@ -408,13 +408,6 @@ const HainaDetailsScreen = ({ route, navigation }) => {
               <Text style={styles.tryOnButtonText}>Încearcă pe animalut</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.addToCartButton}
-              onPress={handleAddToCart}
-            >
-              <Ionicons name="cart-outline" size={20} color="#2D3FE7" style={styles.buttonIcon} />
-              <Text style={styles.addToCartText}>Adaugă în coș</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

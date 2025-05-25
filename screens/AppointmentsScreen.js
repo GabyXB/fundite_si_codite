@@ -19,8 +19,6 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { colors, shadows, neumorphic } from '../utils/theme';
 import { moderateScale } from 'react-native-size-matters';
 
- 
-
 const AppointmentsScreen = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
@@ -55,6 +53,7 @@ const AppointmentsScreen = () => {
       }
 
       const data = await response.json();
+      console.log('Programari:', data);
       
       // Sortăm programările în funcție de data și status
       const now = new Date();
@@ -67,7 +66,9 @@ const AppointmentsScreen = () => {
           id: appointment.id,
           petName: appointment.pet.name,
           service: appointment.serviciu.nume,
-          groomer: appointment.serviciu.groomer || 'Groomer',
+          groomer: appointment.employee
+            ? `${appointment.employee.nume} ${appointment.employee.prenume} (${appointment.employee.rol === 0 ? 'Angajat' : 'Angajat'})`
+            : 'Nesetat',
           date: appointmentDate.toLocaleDateString('ro-RO', {
             day: 'numeric',
             month: 'long',
@@ -183,7 +184,7 @@ const AppointmentsScreen = () => {
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="time-outline" size={20} color="#94A3B8" />
-            <Text style={styles.detailText}>Durată: {appointment.durata} minute</Text>
+            <Text style={styles.detailText}>Durată: {appointment.durata || 60} minute </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -218,7 +219,7 @@ const AppointmentsScreen = () => {
             onPress={() => setActiveTab('upcoming')}
           >
             <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
-              Următoare
+              Neconfirmate
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -226,7 +227,7 @@ const AppointmentsScreen = () => {
             onPress={() => setActiveTab('past')}
           >
             <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
-              Anterioare
+              Confirmate
             </Text>
           </TouchableOpacity>
         </View>

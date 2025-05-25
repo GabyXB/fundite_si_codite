@@ -241,9 +241,9 @@ const RegisterScreen = () => {
                 </TouchableOpacity>
                 <Text style={styles.termsText}>
                   Am citit și sunt de acord cu{' '}
-                  <Text style={styles.link}>Termenii și Condițiile</Text>
+                  <Text style={styles.link} onPress={() => navigation.navigate('TermeniSiConditii')}>Termenii și Condițiile</Text>
                   {' '}și{' '}
-                  <Text style={styles.link}>Politica de Confidențialitate</Text>
+                  <Text style={styles.link} onPress={() => navigation.navigate('PoliticaConf')}>Politica de Confidențialitate</Text>
                 </Text>
               </View>
 

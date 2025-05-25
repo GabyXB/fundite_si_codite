@@ -87,11 +87,10 @@ const ProfileScreen = () => {
     );
   };
 
-  const handleWhatsAppHelp = () => {
-    const phoneNumber = '+40712345678'; // Replace with your actual WhatsApp number
-    const message = 'Bună! Am nevoie de ajutor cu aplicația.';
+  const handleWhatsAppHelp = async () => {
+    let phoneNumber = '+40756894316'; 
+    const message = 'Am nevoie de ajutor';
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
-    
     Linking.canOpenURL(url)
       .then(supported => {
         if (supported) {

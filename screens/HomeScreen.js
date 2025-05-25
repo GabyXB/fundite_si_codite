@@ -208,7 +208,7 @@ const HomeScreen = () => {
           <Ionicons name="search-outline" size={20} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search services or pet issues"
+            placeholder="Caută servicii sau pachete animale"
             placeholderTextColor="#94A3B8"
           />
         </View>
@@ -217,7 +217,7 @@ const HomeScreen = () => {
         <View style={styles.quickAccess}>
           <TouchableOpacity 
             style={styles.quickAccessItem}
-            onPress={() => navigation.navigate('Products', { category: 'Servicii' })}
+            onPress={() => navigation.navigate('Products', { category: 'Tuns', tab: 'services' })}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
               <Ionicons name="paw" size={24} color="#2196F3" />
@@ -226,16 +226,16 @@ const HomeScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.quickAccessItem}
-            onPress={() => navigation.navigate('Products', { category: 'Servicii' })}
+            onPress={() => navigation.navigate('Products', { category: 'Pachete', tab: 'services' })}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
               <Ionicons name="cut" size={24} color="#9C27B0" />
             </View>
-            <Text style={styles.quickAccessText}>Stilizare</Text>
+            <Text style={styles.quickAccessText}>Pachete</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.quickAccessItem}
-            onPress={() => navigation.navigate('Products', { category: 'health' })}
+            onPress={() => navigation.navigate('Products', { category: 'Terapie', tab: 'services' })}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
               <Ionicons name="medkit" size={24} color="#4CAF50" />
@@ -244,7 +244,7 @@ const HomeScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.quickAccessItem}
-            onPress={() => navigation.navigate('Products', { category: 'spa' })}
+            onPress={() => navigation.navigate('Products', { category: 'Pentru Acasa', tab: 'products' })}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
               <Ionicons name="home" size={24} color="#FF9800" />

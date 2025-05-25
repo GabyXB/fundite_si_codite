@@ -142,11 +142,11 @@ const AppointmentDetailsScreen = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case -1: return 'red';
-      case 0: return colors.accent;
-      case 1: return colors.secondary;
-      case 2: return colors.text;
-      default: return colors.accent;
+      case -1: return '#FF5252';
+      case 0: return '#FFC107';
+      case 1: return '#4CAF50';
+      case 2: return '#2196F3';
+      default: return '#FFC107';
     }
   };
 
@@ -229,7 +229,11 @@ const AppointmentDetailsScreen = () => {
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="time" size={20} color={colors.primary} />
-            <Text style={styles.infoText}>Durată: {appointment.serviciu.durata} minute</Text>
+            <Text style={styles.infoText}>Durată: {appointment.serviciu.durata || 60} minute</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="cut" size={20} color={colors.primary} />
+            <Text style={styles.infoText}>La persoana: {appointment.employee.nume} {appointment.employee.prenume}</Text>
           </View>
         </View>
 
@@ -237,7 +241,7 @@ const AppointmentDetailsScreen = () => {
           <Text style={styles.sectionTitle}>Informații despre animal</Text>
           <View style={styles.infoItem}>
             <Ionicons name="paw" size={20} color={colors.primary} />
-            <Text style={styles.infoText}>{appointment.pet.name}</Text>
+            <Text style={styles.infoText}>Nume: {appointment.pet.name}</Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="paw" size={20} color={colors.primary} />

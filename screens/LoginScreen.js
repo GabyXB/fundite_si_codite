@@ -10,12 +10,15 @@ import {
   ScrollView,
   Animated,
   StatusBar,
+  Alert,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthContext from '../context/AuthContext';
 import { fontStyles, createTextStyle } from '../utils/fontSizes';
 import { moderateScale } from 'react-native-size-matters';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
@@ -201,7 +204,22 @@ const LoginScreen = () => {
               />
 
               <TouchableOpacity 
-                onPress={() => navigation.navigate('ForgotPassword')}
+                onPress={async () => {
+                  let phoneNumber = '+40756894316';
+                  const message = 'Am nevoie de ajutor';
+                  const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+                  Linking.canOpenURL(url)
+                    .then(supported => {
+                      if (supported) {
+                        return Linking.openURL(url);
+                      } else {
+                        Alert.alert('Eroare', 'WhatsApp nu este instalat pe acest dispozitiv');
+                      }
+                    })
+                    .catch(err => {
+                      Alert.alert('Eroare', 'Nu s-a putut deschide WhatsApp');
+                    });
+                }}
                 style={styles.forgotPasswordContainer}
               >
                 <Text style={styles.forgotPasswordText}>Ai uitat parola?</Text>
