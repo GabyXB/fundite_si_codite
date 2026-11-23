@@ -6,8 +6,6 @@
 - ✂️ Servicii de stilizare
 - 👕 Îmbrăcare asistată de inteligență artificială (AI) pentru animale de companie
 
-> Proiectul este în continuă dezvoltare și oferă o experiență modernă, completă și accesibilă pe mobil.
-
 ---
 
 ## 📄 Documentație
